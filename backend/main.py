@@ -27,9 +27,11 @@ app.add_middleware(
 
 # 导入路由
 from api.books import router as books_router
+# from api.chat import router as chat_router  # 暂时注释，等langchain问题解决
 
 # 注册路由
 app.include_router(books_router, prefix="/api")
+# app.include_router(chat_router, prefix="/api")  # 暂时注释
 
 # 添加启动事件处理器
 @app.on_event("startup")

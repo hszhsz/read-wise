@@ -7,9 +7,11 @@ from typing import List, Optional
 from datetime import datetime
 
 # 导入服务和模型
-from services.book_processor import process_book
+# from services.book_processor import process_book  # 暂时注释，等langchain问题解决
 from models.book import BookMetadata, BookAnalysisResult
 from models.database import get_database
+from utils.file_utils import save_uploaded_file, extract_text_from_file, generate_unique_filename
+from services.deepseek_client import DeepSeekClient
 
 router = APIRouter(tags=["books"])
 

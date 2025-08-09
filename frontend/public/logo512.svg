@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#4a90e2"/>
-  <text x="256" y="256" font-family="Arial" font-size="260" text-anchor="middle" dy=".3em" fill="white">R</text>
-  <path d="M130,350 L382,350" stroke="white" stroke-width="25" fill="none"/>
-  <path d="M130,400 L320,400" stroke="white" stroke-width="25" fill="none"/>
-</svg>

@@ -4,6 +4,13 @@ from typing import List, Dict, Any, Optional, Tuple
 import mimetypes
 import uuid
 
+# 文件处理库
+import PyPDF2
+from docx import Document
+import ebooklib
+from ebooklib import epub
+from bs4 import BeautifulSoup
+
 # 支持的文件类型映射
 SUPPORTED_MIMETYPES = {
     "application/pdf": ".pdf",
@@ -62,6 +69,83 @@ def generate_unique_filename(original_filename: str, content_type: str) -> Tuple
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
     
     return unique_filename, file_path
+
+def extract_text_from_file(file_path: str) -> str:
+    """从文件中提取文本内容
+    
+    Args:
+        file_path: 文件路径
+        
+    Returns:
+        提取的文本内容
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在: {file_path}")
+    
+    # 根据文件扩展名确定文件类型
+    _, ext = os.path.splitext(file_path.lower())
+    
+    if ext == '.pdf':
+        return extract_from_pdf(file_path)
+    elif ext == '.docx':
+        return extract_from_docx(file_path)
+    elif ext == '.epub':
+        return extract_from_epub(file_path)
+    elif ext == '.txt':
+        return extract_from_txt(file_path)
+    else:
+        raise ValueError(f"不支持的文件类型: {ext}")
+
+def extract_from_pdf(file_path: str) -> str:
+    """从PDF文件提取文本"""
+    text = ""
+    try:
+        with open(file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+    except Exception as e:
+        raise Exception(f"PDF文件读取失败: {str(e)}")
+    return text.strip()
+
+def extract_from_docx(file_path: str) -> str:
+    """从DOCX文件提取文本"""
+    try:
+        doc = Document(file_path)
+        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        return text.strip()
+    except Exception as e:
+        raise Exception(f"DOCX文件读取失败: {str(e)}")
+
+def extract_from_epub(file_path: str) -> str:
+    """从EPUB文件提取文本"""
+    text = ""
+    try:
+        book = epub.read_epub(file_path)
+        for item in book.get_items():
+            if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                content = item.get_content().decode('utf-8')
+                # 使用BeautifulSoup解析HTML并提取文本
+                soup = BeautifulSoup(content, 'html.parser')
+                text += soup.get_text() + "\n"
+    except Exception as e:
+        raise Exception(f"EPUB文件读取失败: {str(e)}")
+    return text.strip()
+
+def extract_from_txt(file_path: str) -> str:
+    """从TXT文件提取文本"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return file.read().strip()
+    except UnicodeDecodeError:
+        # 尝试其他编码
+        try:
+            with open(file_path, 'r', encoding='gbk') as file:
+                return file.read().strip()
+        except Exception as e:
+            raise Exception(f"TXT文件读取失败: {str(e)}")
+    except Exception as e:
+        raise Exception(f"TXT文件读取失败: {str(e)}")
 
 async def save_uploaded_file(file_content: bytes, file_path: str) -> bool:
     """保存上传的文件
