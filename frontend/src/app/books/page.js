@@ -79,6 +79,8 @@ const BooksPage = () => {
         return 'bg-green-100 text-green-800';
       case 'processing':
         return 'bg-yellow-100 text-yellow-800';
+      case 'pending':
+        return 'bg-blue-100 text-blue-800';
       case 'failed':
         return 'bg-red-100 text-red-800';
       default:
@@ -92,6 +94,8 @@ const BooksPage = () => {
         return '已完成';
       case 'processing':
         return '处理中';
+      case 'pending':
+        return '等待处理';
       case 'failed':
         return '处理失败';
       default:
@@ -100,11 +104,25 @@ const BooksPage = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!dateString) {
+      return '未知日期';
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return '无效日期';
+      }
+      
+      return date.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('日期格式化错误:', error);
+      return '日期格式错误';
+    }
   };
 
   const BookCard = ({ book }) => (
@@ -123,7 +141,7 @@ const BooksPage = () => {
             </span>
             <span className="text-gray-500 text-sm flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
-              {formatDate(book.created_at)}
+              {formatDate(book.upload_date)}
             </span>
           </div>
         </div>

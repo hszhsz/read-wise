@@ -21,6 +21,49 @@
 
 ## 项目启动
 
+### 快速启动（推荐）
+
+使用项目启动脚本一键启动所有服务：
+
+```bash
+./start.sh
+```
+
+该脚本会自动：
+- 检查并启动 MongoDB Docker 容器
+- 安装后端和前端依赖
+- 启动后端服务（端口 8000）
+- 启动前端服务（端口 3000）
+
+### 手动启动
+
+如果需要分别启动各个服务：
+
+#### 数据库启动
+
+**推荐使用项目启动脚本**：
+
+```bash
+# 使用项目启动脚本（推荐）
+./start.sh
+```
+
+**或手动启动 MongoDB**：
+
+```bash
+# 使用 Docker 启动 MongoDB（手动方式）
+docker run -d --name readwise-mongodb -p 27017:27017 -v readwise-mongodb-data:/data/db mongo:latest
+
+# 检查容器状态
+docker ps
+
+# 停止 MongoDB
+docker stop readwise-mongodb
+
+# 重新启动 MongoDB
+docker start readwise-mongodb
+```
+
 ### 快速启动
 
 使用根目录的启动脚本：
@@ -36,7 +79,7 @@
 4. 启动前端服务（端口 3000）
 5. 提供优雅的服务停止机制（Ctrl+C）
 
-### 手动启动
+**注意：启动前端和后端服务前，必须确保 MongoDB 已经启动！**
 
 #### 后端服务
 

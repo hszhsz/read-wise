@@ -10,6 +10,9 @@ from agents.state import AgentState, BookInfo, ChatMessage, AnalysisResult, Exec
 from agents.planner import PlannerAgent
 from agents.executor import ExecutorAgent
 from utils.file_utils import extract_text_from_file
+from utils.logger import get_logger
+
+logger = get_logger("agent_workflow")
 
 class BookAnalysisWorkflow:
     """书籍分析工作流 - 基于LangGraph的plan-and-execute智能体"""
@@ -64,6 +67,9 @@ class BookAnalysisWorkflow:
         """开始分析流程"""
         session_id = state.get("session_id", str(uuid.uuid4()))
         
+        logger.info(f"开始书籍分析流程，会话ID: {session_id}")
+        logger.info(f"用户输入: {state.get('user_input', 'none')}")
+        
         # 初始化状态
         welcome_message = AIMessage(
             content="📚 欢迎使用智能书籍分析助手！我将为您深度分析这本书籍，包括内容总结、作者背景调查和相关推荐。让我们开始吧！"
@@ -82,6 +88,8 @@ class BookAnalysisWorkflow:
     
     async def load_book_content(self, state: AgentState) -> AgentState:
         """加载书籍内容"""
+        logger.info("开始加载书籍内容")
+        
         try:
             step = ExecutionStep(
                 step_id=str(uuid.uuid4()),
@@ -93,12 +101,18 @@ class BookAnalysisWorkflow:
             
             book_info = state.get("book_info")
             if not book_info:
+                logger.error("未提供书籍信息")
                 raise ValueError("未提供书籍信息")
+            
+            logger.info(f"书籍信息 - 标题: {book_info.title}, 作者: {book_info.author}")
+            logger.info(f"文件路径: {book_info.file_path}")
             
             # 如果内容为空，尝试从文件加载
             if not book_info.content and book_info.file_path:
+                logger.info("从文件加载书籍内容...")
                 content = extract_text_from_file(book_info.file_path)
                 book_info.content = content
+                logger.info(f"成功加载内容，长度: {len(content)} 字符")
             
             step.output_data = {"content_length": len(book_info.content)}
             step.status = "completed"
@@ -118,9 +132,14 @@ class BookAnalysisWorkflow:
             }
             
         except Exception as e:
+            logger.error(f"加载书籍内容失败: {str(e)}", exc_info=True)
+            
             step.status = "failed"
             step.error = str(e)
             step.end_time = datetime.now()
+            step.duration = (step.end_time - step.start_time).total_seconds()
+            
+            logger.warning(f"内容加载失败，耗时: {step.duration:.2f}秒")
             
             error_message = AIMessage(
                 content=f"❌ 加载书籍内容时出现错误：{str(e)}"
@@ -174,10 +193,14 @@ class BookAnalysisWorkflow:
     
     async def finalize_analysis(self, state: AgentState) -> AgentState:
         """完成分析并生成最终结果"""
+        logger.info("开始最终化分析结果")
+        
         try:
             # 计算总执行时间
             execution_steps = state.get("execution_steps", [])
             total_duration = sum(step.duration or 0 for step in execution_steps)
+            
+            logger.info(f"分析完成 - 总步骤数: {len(execution_steps)}, 总耗时: {total_duration:.2f}秒")
             
             # 构建分析结果
             analysis_result = AnalysisResult(
@@ -189,8 +212,12 @@ class BookAnalysisWorkflow:
                 status="completed" if not state.get("errors") else "completed_with_errors"
             )
             
+            logger.info(f"分析状态: {analysis_result.status}")
+            
             # 生成最终消息
             final_message = self._generate_final_message(state, analysis_result)
+            
+            logger.info("分析结果最终化完成")
             
             return {
                 **state,
@@ -220,9 +247,14 @@ class BookAnalysisWorkflow:
         errors = state.get("errors", [])
         latest_error = errors[-1] if errors else "未知错误"
         
+        logger.error(f"工作流错误处理 - 最新错误: {latest_error}")
+        logger.error(f"总错误数: {len(errors)}")
+        
         error_message = AIMessage(
             content=f"⚠️ 分析过程中遇到问题：{latest_error}\n\n我会尽力完成其他可执行的任务。"
         )
+        
+        logger.info("错误处理完成，继续执行其他任务")
         
         return {
             **state,
@@ -267,6 +299,11 @@ class BookAnalysisWorkflow:
     
     async def run_analysis(self, book_info: BookInfo, user_input: str = "") -> Dict[str, Any]:
         """运行完整的书籍分析流程"""
+        session_id = str(uuid.uuid4())
+        logger.info(f"开始运行书籍分析流程 - 会话ID: {session_id}")
+        logger.info(f"书籍: 《{book_info.title}》 作者: {book_info.author}")
+        logger.info(f"用户输入: {user_input or '默认分析请求'}")
+        
         # 初始化状态
         initial_state = AgentState(
             messages=[HumanMessage(content=user_input or f"请分析书籍《{book_info.title}》")],
@@ -276,15 +313,21 @@ class BookAnalysisWorkflow:
             results={},
             execution_steps=[],
             errors=[],
-            session_id=str(uuid.uuid4()),
+            session_id=session_id,
             user_input=user_input or f"请分析书籍《{book_info.title}》",
             needs_human_input=False,
             current_step="initialized",
             is_complete=False
         )
         
+        logger.info("初始状态创建完成，开始执行工作流")
+        
         # 运行工作流
         final_state = await self.workflow.ainvoke(initial_state)
+        
+        logger.info(f"工作流执行完成 - 最终状态: {final_state.get('current_step', 'unknown')}")
+        logger.info(f"是否完成: {final_state.get('is_complete', False)}")
+        logger.info(f"错误数量: {len(final_state.get('errors', []))}")
         
         return final_state
     
@@ -433,4 +476,43 @@ class BookAnalysisAgent:
             "book_info": self.state.get("book_info").dict() if self.state.get("book_info") else None,
             "results": self.state.get("results", {}),
             "errors": self.state.get("errors", [])
+        }
+
+
+# 独立函数供API调用
+async def run_analysis(book_content: str, user_input: str = "") -> Dict[str, Any]:
+    """运行书籍分析的独立函数"""
+    logger.info(f"开始分析书籍内容，内容长度: {len(book_content)} 字符")
+    logger.info(f"用户输入: {user_input}")
+    
+    try:
+        # 创建OpenAI客户端
+        client = OpenAIClient()
+        
+        # 创建工作流实例
+        workflow = BookAnalysisWorkflow(client)
+        
+        # 创建书籍信息
+        book_info = BookInfo(
+            id=str(uuid.uuid4()),
+            title="上传的书籍",
+            author="未知作者",
+            content=book_content
+        )
+        
+        # 运行分析
+        result = await workflow.run_analysis(book_info, user_input)
+        logger.info(f"分析完成，结果: {result}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"分析过程中发生错误: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "final_output": {
+                "summary": "分析失败",
+                "key_points": []
+            }
         }

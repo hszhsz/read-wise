@@ -68,3 +68,6 @@ Thumbs.db
 #next
 frontend/.next
 .next
+
+#env
+.env

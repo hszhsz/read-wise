@@ -12,6 +12,7 @@ from models.book import BookMetadata, BookAnalysisResult
 from models.database import get_database
 from utils.file_utils import save_uploaded_file, extract_text_from_file, generate_unique_filename
 from services.openai_client import OpenAIClient
+from agents.workflow import run_analysis
 
 router = APIRouter(tags=["books"])
 
@@ -160,40 +161,30 @@ async def analyze_book_content(book_id: str, file_path: str, db):
         
         # 读取文件内容
         print(f"读取文件内容: {file_path}")
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        print(f"文件内容长度: {len(content)} 字符")
+        try:
+            content = extract_text_from_file(file_path)
+            print(f"文件内容长度: {len(content)} 字符")
+        except Exception as e:
+            print(f"文件内容提取失败: {str(e)}")
+            raise Exception(f"无法提取文件内容: {str(e)}")
         
-        # 创建OpenAI客户端
-        print("创建OpenAI客户端")
-        client = OpenAIClient()
+        # 使用Agent Workflow进行分析
+        print("开始使用Agent Workflow分析书籍")
         
-        # 生成摘要
-        print("开始生成摘要")
-        summary_prompt = f"请为以下书籍内容生成一个简洁的摘要（200字以内）：\n\n{content[:2000]}..."
-        print(f"摘要提示词: {summary_prompt[:100]}...")
-        summary_response = await client.generate(summary_prompt)
-        print(f"摘要响应: {summary_response}")
-        # 从响应中正确提取内容
-        if 'choices' in summary_response and len(summary_response['choices']) > 0:
-            summary = summary_response['choices'][0]['message']['content']
+        # 调用agent workflow
+        analysis_result = await run_analysis(
+            book_content=content,
+            user_input="请分析这本书的内容，提供摘要、关键点和推荐"
+        )
+        print(f"Agent分析结果: {analysis_result}")
+        
+        # 从agent结果中提取信息
+        if analysis_result and hasattr(analysis_result, 'final_output'):
+            summary = analysis_result.final_output.get('summary', '分析完成')
+            key_points = analysis_result.final_output.get('key_points', [])
         else:
-            summary = '摘要生成失败'
-        print(f"生成的摘要: {summary}")
-        
-        # 提取关键点
-        print("开始提取关键点")
-        key_points_prompt = f"请从以下书籍内容中提取3-5个关键要点：\n\n{content[:2000]}..."
-        print(f"关键点提示词: {key_points_prompt[:100]}...")
-        key_points_response = await client.generate(key_points_prompt)
-        print(f"关键点响应: {key_points_response}")
-        # 从响应中正确提取内容
-        if 'choices' in key_points_response and len(key_points_response['choices']) > 0:
-            key_points_text = key_points_response['choices'][0]['message']['content']
-        else:
-            key_points_text = ''
-        key_points = [point.strip() for point in key_points_text.split('\n') if point.strip()]
-        print(f"提取的关键点: {key_points}")
+            summary = '分析完成'
+            key_points = []
         
         # 获取书籍元数据
         book = await db.books.find_one({"id": book_id})
@@ -211,15 +202,15 @@ async def analyze_book_content(book_id: str, file_path: str, db):
                 "status": "completed"
             },
             "summary": {
-                "main_points": key_points[:5],
-                "key_concepts": [],
-                "conclusion": summary
+                "main_points": key_points[:5] if key_points else ["暂无关键点"],
+                "key_concepts": [{"concept": "暂无概念", "description": "暂无描述"}],
+                "conclusion": summary or "分析完成"
             },
             "author_info": {
                 "name": book["author"],
                 "background": "暂无信息",
                 "writing_style": "暂无信息",
-                "notable_works": []
+                "notable_works": ["暂无作品"]
             },
             "recommendations": [],
             "processing_time": 0.0,

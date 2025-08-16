@@ -8,6 +8,9 @@ from pydantic import BaseModel, Field
 
 from services.openai_client import OpenAIClient
 from agents.state import AgentState, BookAnalysisTask, ExecutionStep
+from utils.logger import get_logger
+
+logger = get_logger("agent_planner")
 
 class PlanStep(BaseModel):
     """计划步骤"""
@@ -54,6 +57,13 @@ class PlannerAgent:
     
     async def create_plan(self, state: AgentState) -> AgentState:
         """创建分析计划"""
+        logger.info("开始创建分析计划")
+        logger.info(f"用户输入: {state['user_input']}")
+        
+        book_title = state["book_info"].title if state["book_info"] else "未知"
+        book_author = state["book_info"].author if state["book_info"] else "未知"
+        logger.info(f"书籍信息 - 标题: {book_title}, 作者: {book_author}")
+        
         try:
             # 记录执行步骤
             step = ExecutionStep(
@@ -62,8 +72,8 @@ class PlannerAgent:
                 agent_name="planner",
                 input_data={
                     "user_input": state["user_input"],
-                    "book_title": state["book_info"].title if state["book_info"] else "未知",
-                    "book_author": state["book_info"].author if state["book_info"] else "未知"
+                    "book_title": book_title,
+                    "book_author": book_author
                 },
                 status="running"
             )
@@ -77,6 +87,7 @@ class PlannerAgent:
             )
             
             # 调用LLM生成计划
+            logger.info("正在调用LLM生成分析计划...")
             response = await self.client.generate(
                 prompt=prompt[0].content,
                 system_message=prompt[0].content if len(prompt) > 1 else None,
@@ -85,7 +96,9 @@ class PlannerAgent:
             )
             
             # 解析响应
+            logger.info("解析LLM响应...")
             plan_data = self.parser.parse(response["choices"][0]["message"]["content"])
+            logger.info(f"计划生成成功，包含 {len(plan_data.steps)} 个步骤")
             
             # 创建任务列表
             tasks = []
@@ -97,6 +110,7 @@ class PlannerAgent:
                     status="pending"
                 )
                 tasks.append(task)
+                logger.info(f"创建任务 {i+1}: {step.task_type} - {step.description}")
             
             # 更新状态
             step.output_data = {
@@ -123,9 +137,14 @@ class PlannerAgent:
             
         except Exception as e:
             # 错误处理
+            logger.error(f"创建分析计划失败: {str(e)}", exc_info=True)
+            
             step.status = "failed"
             step.error = str(e)
             step.end_time = datetime.now()
+            step.duration = (step.end_time - step.start_time).total_seconds()
+            
+            logger.warning(f"计划创建失败，耗时: {step.duration:.2f}秒")
             
             error_message = AIMessage(
                 content=f"抱歉，制定分析计划时出现错误：{str(e)}"

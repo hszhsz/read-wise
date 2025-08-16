@@ -31,8 +31,37 @@ const BookDetailPage = () => {
   const fetchBookDetail = async () => {
     try {
       setLoading(true);
-      const response = await booksApi.getBookDetail(bookId);
-      setCurrentBook(response.data);
+      
+      // 获取书籍基本信息
+      const infoResponse = await booksApi.getBookDetail(bookId);
+      const bookInfo = infoResponse.data;
+      
+      // 尝试获取分析结果
+      try {
+        const analysisResponse = await booksApi.getBookAnalysis(bookId);
+        const analysisData = analysisResponse.data;
+        
+        // 合并基本信息和分析结果
+        const combinedData = {
+          ...bookInfo,
+          // 从分析结果中提取摘要和关键信息
+          summary: analysisData.summary?.conclusion || null,
+          main_points: analysisData.summary?.main_points || [],
+          key_concepts: analysisData.summary?.key_concepts || [],
+          author_info: analysisData.author_info || null,
+          recommendations: analysisData.recommendations || [],
+          analysis_available: true
+        };
+        
+        setCurrentBook(combinedData);
+      } catch (analysisError) {
+        console.log('分析结果暂未生成或获取失败:', analysisError);
+        // 如果分析结果不存在，只使用基本信息
+        setCurrentBook({
+          ...bookInfo,
+          analysis_available: false
+        });
+      }
     } catch (error) {
       console.error('获取书籍详情失败:', error);
       addNotification({
@@ -95,13 +124,27 @@ const BookDetailPage = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) {
+      return '未知日期';
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return '无效日期';
+      }
+      
+      return date.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('日期格式化错误:', error);
+      return '日期格式错误';
+    }
   };
 
   const getStatusColor = (status) => {
@@ -110,6 +153,8 @@ const BookDetailPage = () => {
         return 'bg-green-100 text-green-800';
       case 'processing':
         return 'bg-yellow-100 text-yellow-800';
+      case 'pending':
+        return 'bg-blue-100 text-blue-800';
       case 'failed':
         return 'bg-red-100 text-red-800';
       default:
@@ -123,6 +168,8 @@ const BookDetailPage = () => {
         return '已完成';
       case 'processing':
         return '处理中';
+      case 'pending':
+        return '等待处理';
       case 'failed':
         return '处理失败';
       default:
@@ -172,7 +219,7 @@ const BookDetailPage = () => {
                   </div>
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-5 w-5 text-gray-500" />
-                    <span className="text-gray-600">{formatDate(currentBook.created_at)}</span>
+                    <span className="text-gray-600">{formatDate(currentBook.upload_date)}</span>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(currentBook.status)}`}>
                     {getStatusText(currentBook.status)}
@@ -247,19 +294,136 @@ const BookDetailPage = () => {
             <div className="p-8">
               {activeTab === 'info' && (
                 <div className="space-y-8">
+                  {/* 分析状态提示 */}
+                  {(currentBook.status === 'pending' || currentBook.status === 'processing' || !currentBook.analysis_available) && currentBook.status !== 'completed' && (
+                    <div className={`border rounded-xl p-6 ${
+                      currentBook.status === 'pending' 
+                        ? 'bg-blue-50 border-blue-200' 
+                        : 'bg-yellow-50 border-yellow-200'
+                    }`}>
+                      <div className="flex items-center space-x-3">
+                        <Loader2 className={`h-5 w-5 animate-spin ${
+                          currentBook.status === 'pending' 
+                            ? 'text-blue-600' 
+                            : 'text-yellow-600'
+                        }`} />
+                        <div>
+                          <h3 className={`text-lg font-semibold ${
+                            currentBook.status === 'pending' 
+                              ? 'text-blue-800' 
+                              : 'text-yellow-800'
+                          }`}>
+                            {currentBook.status === 'pending' ? '等待AI分析' : 'AI 分析进行中'}
+                          </h3>
+                          <p className={`${
+                            currentBook.status === 'pending' 
+                              ? 'text-blue-700' 
+                              : 'text-yellow-700'
+                          }`}>
+                            {currentBook.status === 'pending' 
+                              ? '书籍已上传成功，正在等待AI智能分析，请稍候...' 
+                              : '书籍正在进行智能分析，分析完成后将显示详细结果。'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 书籍摘要 */}
                   {currentBook.summary && (
                     <div>
                       <h3 className="text-xl font-bold text-gray-800 mb-4">AI 智能摘要</h3>
                       <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-6">
-                        <ReactMarkdown className="prose prose-orange max-w-none">
-                          {currentBook.summary}
-                        </ReactMarkdown>
+                        <div className="prose prose-orange max-w-none">
+                          <ReactMarkdown>
+                            {currentBook.summary}
+                          </ReactMarkdown>
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  {/* 关键词 */}
+                  {/* 主要观点 */}
+                  {currentBook.main_points && currentBook.main_points.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">主要观点</h3>
+                      <div className="bg-blue-50 rounded-xl p-6">
+                        <ul className="space-y-3">
+                          {currentBook.main_points.map((point, index) => (
+                            <li key={index} className="flex items-start space-x-3">
+                              <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                                {index + 1}
+                              </span>
+                              <span className="text-gray-800">{point}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 关键概念 */}
+                  {currentBook.key_concepts && currentBook.key_concepts.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">关键概念</h3>
+                      <div className="grid gap-4">
+                        {currentBook.key_concepts.map((concept, index) => (
+                          <div key={index} className="bg-purple-50 rounded-xl p-4">
+                            <h4 className="font-semibold text-purple-800 mb-2">{concept.name || concept.title}</h4>
+                            <p className="text-purple-700">{concept.description || concept.explanation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 作者信息 */}
+                  {currentBook.author_info && (
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">作者信息</h3>
+                      <div className="bg-green-50 rounded-xl p-6">
+                        <h4 className="font-semibold text-green-800 mb-2">{currentBook.author_info.name}</h4>
+                        {currentBook.author_info.background && (
+                          <p className="text-green-700 mb-3">{currentBook.author_info.background}</p>
+                        )}
+                        {currentBook.author_info.writing_style && (
+                          <div className="mb-3">
+                            <span className="font-medium text-green-800">写作风格：</span>
+                            <span className="text-green-700">{currentBook.author_info.writing_style}</span>
+                          </div>
+                        )}
+                        {currentBook.author_info.notable_works && currentBook.author_info.notable_works.length > 0 && (
+                          <div>
+                            <span className="font-medium text-green-800">代表作品：</span>
+                            <span className="text-green-700">{currentBook.author_info.notable_works.join('、')}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 推荐书籍 */}
+                  {currentBook.recommendations && currentBook.recommendations.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">相关推荐</h3>
+                      <div className="grid gap-4">
+                        {currentBook.recommendations.map((rec, index) => (
+                          <div key={index} className="bg-rose-50 rounded-xl p-4">
+                            <h4 className="font-semibold text-rose-800 mb-1">{rec.title}</h4>
+                            <p className="text-rose-600 text-sm mb-2">作者：{rec.author}</p>
+                            <p className="text-rose-700">{rec.reason}</p>
+                            {rec.similarity_score && (
+                              <div className="mt-2">
+                                <span className="text-xs text-rose-600">相似度：{Math.round(rec.similarity_score * 100)}%</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 关键词（保留原有功能） */}
                   {currentBook.keywords && currentBook.keywords.length > 0 && (
                     <div>
                       <h3 className="text-xl font-bold text-gray-800 mb-4">关键词</h3>
@@ -337,9 +501,11 @@ const BookDetailPage = () => {
                                 : 'bg-gray-100 text-gray-800'
                             }`}
                           >
-                            <ReactMarkdown className="prose prose-sm max-w-none">
-                              {message.content}
-                            </ReactMarkdown>
+                            <div className="prose prose-sm max-w-none">
+                                <ReactMarkdown>
+                                  {message.content}
+                                </ReactMarkdown>
+                              </div>
                             <div className={`text-xs mt-1 ${
                               message.sender === 'user' ? 'text-orange-100' : 'text-gray-500'
                             }`}>

@@ -10,6 +10,9 @@ from pydantic import BaseModel, Field
 from services.openai_client import OpenAIClient
 from agents.state import AgentState, BookAnalysisTask, ExecutionStep, ChatMessage
 from agents.tools import BookSummaryTool, AuthorResearchTool, RecommendationTool
+from utils.logger import get_logger
+
+logger = get_logger("agent_executor")
 
 class TaskResult(BaseModel):
     """任务执行结果"""
@@ -34,17 +37,21 @@ class ExecutorAgent:
     
     async def execute_next_task(self, state: AgentState) -> AgentState:
         """执行下一个待处理的任务"""
+        logger.info("开始查找下一个待执行的任务")
+        
         # 找到下一个待执行的任务
         next_task = self._get_next_task(state["plan"])
         
         if not next_task:
             # 所有任务已完成
+            logger.info("所有任务已完成")
             return {
                 **state,
                 "current_step": "all_tasks_completed",
                 "is_complete": True
             }
         
+        logger.info(f"找到待执行任务: {next_task.task_type} - {next_task.description}")
         # 执行任务
         return await self._execute_task(state, next_task)
     
@@ -57,6 +64,8 @@ class ExecutorAgent:
     
     async def _execute_task(self, state: AgentState, task: BookAnalysisTask) -> AgentState:
         """执行具体任务"""
+        logger.info(f"开始执行任务: {task.task_type} (ID: {task.task_id})")
+        
         try:
             # 记录执行步骤
             step = ExecutionStep(
@@ -73,14 +82,21 @@ class ExecutorAgent:
             
             # 更新任务状态
             task.status = "in_progress"
+            logger.info(f"任务状态更新为: in_progress")
             
             # 获取对应的工具
             tool = self.tools.get(task.task_type)
             if not tool:
-                raise ValueError(f"未找到任务类型 {task.task_type} 对应的工具")
+                error_msg = f"未找到任务类型 {task.task_type} 对应的工具"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            logger.info(f"使用工具: {tool.__class__.__name__} 执行任务")
             
             # 执行工具
             result = await tool.execute(state["book_info"], state.get("results", {}))
+            
+            logger.info(f"任务执行成功，结果类型: {type(result).__name__}")
             
             # 更新任务结果
             task.status = "completed"
@@ -92,6 +108,8 @@ class ExecutorAgent:
             step.status = "completed"
             step.end_time = datetime.now()
             step.duration = (step.end_time - step.start_time).total_seconds()
+            
+            logger.info(f"任务完成，耗时: {step.duration:.2f}秒")
             
             # 更新结果
             updated_results = state.get("results", {})
@@ -112,12 +130,17 @@ class ExecutorAgent:
             
         except Exception as e:
             # 错误处理
+            logger.error(f"任务执行失败: {task.task_type} (ID: {task.task_id}), 错误: {str(e)}", exc_info=True)
+            
             task.status = "failed"
             task.error = str(e)
             
             step.status = "failed"
             step.error = str(e)
             step.end_time = datetime.now()
+            step.duration = (step.end_time - step.start_time).total_seconds()
+            
+            logger.warning(f"任务失败，耗时: {step.duration:.2f}秒")
             
             error_message = AIMessage(
                 content=f"执行任务 '{task.description}' 时出现错误：{str(e)}"

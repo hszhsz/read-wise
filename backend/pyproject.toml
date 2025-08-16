@@ -22,7 +22,7 @@ dependencies = [
     "ebooklib==0.18",
     "python-multipart==0.0.6",
     "motor==3.3.2",
-    "aiohttp==3.9.5"
+    "aiohttp==3.9.5",
 ]
 
 [build-system]
