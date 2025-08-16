@@ -15,8 +15,8 @@ from utils.env import get_env
 logger = setup_logger()
 
 # 检查必要的环境变量
-if not get_env("DEEPSEEK_API_KEY"):
-    log_error("DEEPSEEK_API_KEY 环境变量未设置", exc_info=False)
+if not get_env("OPENAI_API_KEY"):
+    log_error("OPENAI_API_KEY 环境变量未设置", exc_info=False)
 
 app = FastAPI(title="Readwise API", description="读书辅助软件API服务")
 

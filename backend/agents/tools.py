@@ -5,7 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 
-from services.deepseek_client import DeepSeekClient
+from services.openai_client import OpenAIClient
 from .state import BookInfo
 
 class ToolResult(BaseModel):
@@ -18,8 +18,8 @@ class ToolResult(BaseModel):
 class BaseTool(ABC):
     """工具基类"""
     
-    def __init__(self, deepseek_client: DeepSeekClient):
-        self.client = deepseek_client
+    def __init__(self, openai_client: OpenAIClient):
+        self.client = openai_client
     
     @abstractmethod
     async def execute(self, book_info: BookInfo, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -38,8 +38,8 @@ class BookSummaryResult(BaseModel):
 class BookSummaryTool(BaseTool):
     """书籍总结工具"""
     
-    def __init__(self, deepseek_client: DeepSeekClient):
-        super().__init__(deepseek_client)
+    def __init__(self, openai_client: OpenAIClient):
+        super().__init__(openai_client)
         self.parser = JsonOutputParser(pydantic_object=BookSummaryResult)
         
         self.prompt = ChatPromptTemplate.from_messages([
@@ -123,8 +123,8 @@ class AuthorResearchResult(BaseModel):
 class AuthorResearchTool(BaseTool):
     """作者研究工具"""
     
-    def __init__(self, deepseek_client: DeepSeekClient):
-        super().__init__(deepseek_client)
+    def __init__(self, openai_client: OpenAIClient):
+        super().__init__(openai_client)
         self.parser = JsonOutputParser(pydantic_object=AuthorResearchResult)
         
         self.prompt = ChatPromptTemplate.from_messages([
@@ -211,10 +211,10 @@ class RecommendationResult(BaseModel):
     categories: List[str] = Field(description="推荐类别")
 
 class RecommendationTool(BaseTool):
-    """书籍推荐工具"""
+    """推荐工具"""
     
-    def __init__(self, deepseek_client: DeepSeekClient):
-        super().__init__(deepseek_client)
+    def __init__(self, openai_client: OpenAIClient):
+        super().__init__(openai_client)
         self.parser = JsonOutputParser(pydantic_object=RecommendationResult)
         
         self.prompt = ChatPromptTemplate.from_messages([

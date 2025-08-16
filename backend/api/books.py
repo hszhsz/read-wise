@@ -11,7 +11,7 @@ from datetime import datetime
 from models.book import BookMetadata, BookAnalysisResult
 from models.database import get_database
 from utils.file_utils import save_uploaded_file, extract_text_from_file, generate_unique_filename
-from services.deepseek_client import DeepSeekClient
+from services.openai_client import OpenAIClient
 
 router = APIRouter(tags=["books"])
 
@@ -116,7 +116,7 @@ async def get_book_info(book_id: str, db = Depends(get_database)):
 @router.get("/books/{book_id}", response_model=BookAnalysisResult)
 async def get_book_analysis(book_id: str, db = Depends(get_database)):
     # 从数据库获取书籍分析结果
-    result = await db.book_results.find_one({"book_id": book_id})
+    result = await db.book_analysis.find_one({"book_id": book_id})
     if not result:
         # 检查书籍是否存在但尚未处理完成
         book = await db.books.find_one({"id": book_id})
@@ -133,6 +133,125 @@ async def get_book_analysis(book_id: str, db = Depends(get_database)):
 async def get_book_analysis_alt(book_id: str, db = Depends(get_database)):
     """替代路由，与 /books/{book_id} 功能相同，提供更明确的API路径"""
     return await get_book_analysis(book_id, db)
+
+@router.post("/books/{book_id}/analyze")
+async def analyze_book(book_id: str, background_tasks: BackgroundTasks, db = Depends(get_database)):
+    """手动触发书籍分析"""
+    # 检查书籍是否存在
+    book = await db.books.find_one({"id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
+    
+    # 启动分析任务
+    background_tasks.add_task(analyze_book_content, book_id, book["file_path"], db)
+    
+    return {"message": "分析任务已启动", "book_id": book_id}
+
+async def analyze_book_content(book_id: str, file_path: str, db):
+    """分析书籍内容的后台任务"""
+    print(f"开始分析书籍: {book_id}")
+    try:
+        # 更新状态为处理中
+        print(f"更新书籍状态为processing: {book_id}")
+        await db.books.update_one(
+            {"id": book_id},
+            {"$set": {"status": "processing"}}
+        )
+        
+        # 读取文件内容
+        print(f"读取文件内容: {file_path}")
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        print(f"文件内容长度: {len(content)} 字符")
+        
+        # 创建OpenAI客户端
+        print("创建OpenAI客户端")
+        client = OpenAIClient()
+        
+        # 生成摘要
+        print("开始生成摘要")
+        summary_prompt = f"请为以下书籍内容生成一个简洁的摘要（200字以内）：\n\n{content[:2000]}..."
+        print(f"摘要提示词: {summary_prompt[:100]}...")
+        summary_response = await client.generate(summary_prompt)
+        print(f"摘要响应: {summary_response}")
+        # 从响应中正确提取内容
+        if 'choices' in summary_response and len(summary_response['choices']) > 0:
+            summary = summary_response['choices'][0]['message']['content']
+        else:
+            summary = '摘要生成失败'
+        print(f"生成的摘要: {summary}")
+        
+        # 提取关键点
+        print("开始提取关键点")
+        key_points_prompt = f"请从以下书籍内容中提取3-5个关键要点：\n\n{content[:2000]}..."
+        print(f"关键点提示词: {key_points_prompt[:100]}...")
+        key_points_response = await client.generate(key_points_prompt)
+        print(f"关键点响应: {key_points_response}")
+        # 从响应中正确提取内容
+        if 'choices' in key_points_response and len(key_points_response['choices']) > 0:
+            key_points_text = key_points_response['choices'][0]['message']['content']
+        else:
+            key_points_text = ''
+        key_points = [point.strip() for point in key_points_text.split('\n') if point.strip()]
+        print(f"提取的关键点: {key_points}")
+        
+        # 获取书籍元数据
+        book = await db.books.find_one({"id": book_id})
+        
+        # 构建符合BookAnalysisResult模型的数据结构
+        analysis_result = {
+            "book_id": book_id,
+            "metadata": {
+                "id": book["id"],
+                "title": book["title"],
+                "author": book["author"],
+                "file_path": book["file_path"],
+                "file_type": book["file_type"],
+                "upload_date": book["upload_date"],
+                "status": "completed"
+            },
+            "summary": {
+                "main_points": key_points[:5],
+                "key_concepts": [],
+                "conclusion": summary
+            },
+            "author_info": {
+                "name": book["author"],
+                "background": "暂无信息",
+                "writing_style": "暂无信息",
+                "notable_works": []
+            },
+            "recommendations": [],
+            "processing_time": 0.0,
+            "created_at": datetime.now()
+        }
+        print(f"准备保存分析结果: {analysis_result}")
+        
+        # 更新数据库
+        print("开始更新book_analysis集合")
+        result = await db.book_analysis.replace_one(
+            {"book_id": book_id},
+            analysis_result,
+            upsert=True
+        )
+        print(f"book_analysis更新结果: {result.modified_count} modified, {result.upserted_id} upserted")
+        
+        # 更新书籍状态
+        print("开始更新书籍状态为completed")
+        book_result = await db.books.update_one(
+            {"id": book_id},
+            {"$set": {"status": "completed"}}
+        )
+        print(f"书籍状态更新结果: {book_result.modified_count} modified")
+        print(f"分析任务完成: {book_id}")
+        
+    except Exception as e:
+        # 更新状态为失败
+        await db.books.update_one(
+            {"id": book_id},
+            {"$set": {"status": "failed"}}
+        )
+        print(f"分析书籍 {book_id} 时出错: {str(e)}")
 
 @router.get("/books")
 async def list_books(

@@ -21,12 +21,14 @@ from langchain.schema import Document as LangchainDocument
 from models.database import get_database
 from models.book import BookMetadata, BookSummary, AuthorInfo, ReadingRecommendation, BookAnalysisResult
 
-# DeepSeek API客户端
-from services.deepseek_client import DeepSeekClient
+# OpenAI API客户端
+from services.openai_client import OpenAIClient
 
-# 获取API密钥
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-deepseek_client = DeepSeekClient(api_key=DEEPSEEK_API_KEY)
+# 获取API密钥和配置
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL")
+openai_client = OpenAIClient(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=DEFAULT_MODEL)
 
 # 文本分割器
 text_splitter = RecursiveCharacterTextSplitter(
@@ -241,8 +243,8 @@ async def generate_book_summary(state):
     # 合并文本块以获取代表性内容
     combined_text = "\n\n".join([chunk.page_content for chunk in text_chunks[:5]])
     
-    # 调用DeepSeek模型
-    response = await deepseek_client.generate(
+    # 调用OpenAI模型
+    response = await openai_client.generate(
         prompt=summary_prompt.format(
             title=metadata.title,
             author=metadata.author,
@@ -298,8 +300,8 @@ async def get_author_information(state):
         """
     )
     
-    # 调用DeepSeek模型
-    response = await deepseek_client.generate(
+    # 调用OpenAI模型
+    response = await openai_client.generate(
         prompt=author_prompt.format(author=metadata.author),
         max_tokens=1000
     )
@@ -363,8 +365,8 @@ async def recommend_further_reading(state):
     # 合并文本块以获取代表性内容
     combined_text = "\n\n".join([chunk.page_content for chunk in text_chunks[:3]])
     
-    # 调用DeepSeek模型
-    response = await deepseek_client.generate(
+    # 调用OpenAI模型
+    response = await openai_client.generate(
         prompt=recommendation_prompt.format(
             title=metadata.title,
             author=metadata.author,

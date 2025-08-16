@@ -31,13 +31,13 @@ def load_env_vars():
             logger.warning("未找到.env文件，使用系统环境变量")
 
     # 检查必要的环境变量
-    required_vars = ["DEEPSEEK_API_KEY", "MONGO_URL", "DATABASE_NAME"]
+    required_vars = ["OPENAI_API_KEY", "MONGO_URL", "DATABASE_NAME"]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
         logger.warning(f"缺少以下环境变量: {', '.join(missing_vars)}")
-        if "DEEPSEEK_API_KEY" in missing_vars:
-            logger.error("缺少DEEPSEEK_API_KEY，大语言模型功能将无法使用")
+        if "OPENAI_API_KEY" in missing_vars:
+            logger.error("缺少OPENAI_API_KEY，大语言模型功能将无法使用")
 
 # 获取环境变量，带默认值
 def get_env(key, default=None):

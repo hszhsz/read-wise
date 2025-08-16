@@ -6,27 +6,29 @@ import random
 from typing import Dict, Any, Optional, List
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-class DeepSeekClient:
-    """DeepSeek API客户端"""
+class OpenAIClient:
+    """OpenAI兼容API客户端"""
     
-    def __init__(self, api_key: Optional[str] = None):
-        """初始化DeepSeek客户端
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):
+        """初始化OpenAI客户端
         
         Args:
-            api_key: DeepSeek API密钥，如果为None，则从环境变量获取
+            api_key: OpenAI API密钥，如果为None，则从环境变量获取
+            base_url: API基础URL，如果为None，则从环境变量获取
+            model: 默认模型，如果为None，则从环境变量获取
         """
         # 检查是否使用模拟模式
         self.use_mock = os.getenv("USE_MOCK_API", "").lower() in ["true", "1", "yes"]
         
-        self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key and not self.use_mock:
-            raise ValueError("DeepSeek API密钥未提供，请设置DEEPSEEK_API_KEY环境变量或启用USE_MOCK_API=true")
+            raise ValueError("OpenAI API密钥未提供，请设置OPENAI_API_KEY环境变量或启用USE_MOCK_API=true")
         
         if self.use_mock:
             print("警告: 使用模拟API模式，生成的内容为模拟数据")
             
-        self.api_base = "https://api.deepseek.com/v1"
-        self.model = "deepseek-chat"  # 默认模型
+        self.api_base = (base_url or os.getenv("OPENAI_BASE_URL", "https://api.openai.com")).rstrip('/') + "/v1"
+        self.model = model or os.getenv("DEFAULT_MODEL", "gpt-3.5-turbo")  # 默认模型
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def generate(self, 
@@ -40,7 +42,7 @@ class DeepSeekClient:
         
         Args:
             prompt: 提示文本
-            model: 使用的模型，默认为deepseek-chat
+            model: 使用的模型，默认为配置的模型
             max_tokens: 生成的最大token数
             temperature: 温度参数，控制随机性
             top_p: 控制输出多样性
@@ -81,7 +83,7 @@ class DeepSeekClient:
                                    json=data) as response:
                 if response.status != 200:
                     error_text = await response.text()
-                    raise Exception(f"DeepSeek API请求失败: {response.status} - {error_text}")
+                    raise Exception(f"OpenAI API请求失败: {response.status} - {error_text}")
                 
                 return await response.json()
     

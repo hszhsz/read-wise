@@ -6,7 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 
-from services.deepseek_client import DeepSeekClient
+from services.openai_client import OpenAIClient
 from agents.state import AgentState, BookAnalysisTask, ExecutionStep
 
 class PlanStep(BaseModel):
@@ -24,8 +24,8 @@ class AnalysisPlan(BaseModel):
 class PlannerAgent:
     """规划器智能体 - 负责分析用户需求并制定执行计划"""
     
-    def __init__(self, deepseek_client: DeepSeekClient):
-        self.client = deepseek_client
+    def __init__(self, openai_client: OpenAIClient):
+        self.client = openai_client
         self.parser = JsonOutputParser(pydantic_object=AnalysisPlan)
         
         # 规划提示模板

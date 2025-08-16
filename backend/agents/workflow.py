@@ -5,7 +5,7 @@ from datetime import datetime
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
-from services.deepseek_client import DeepSeekClient
+from services.openai_client import OpenAIClient
 from agents.state import AgentState, BookInfo, ChatMessage, AnalysisResult, ExecutionStep
 from agents.planner import PlannerAgent
 from agents.executor import ExecutorAgent
@@ -14,10 +14,10 @@ from utils.file_utils import extract_text_from_file
 class BookAnalysisWorkflow:
     """书籍分析工作流 - 基于LangGraph的plan-and-execute智能体"""
     
-    def __init__(self, deepseek_client: DeepSeekClient):
-        self.client = deepseek_client
-        self.planner = PlannerAgent(deepseek_client)
-        self.executor = ExecutorAgent(deepseek_client)
+    def __init__(self, openai_client: OpenAIClient):
+        self.client = openai_client
+        self.planner = PlannerAgent(openai_client)
+        self.executor = ExecutorAgent(openai_client)
         
         # 构建工作流图
         self.workflow = self._build_workflow()
@@ -364,8 +364,8 @@ class BookAnalysisAgent:
     """书籍分析智能体 - BookAnalysisWorkflow的包装器，提供简化的接口"""
     
     def __init__(self):
-        from services.deepseek_client import DeepSeekClient
-        self.client = DeepSeekClient()
+        from services.openai_client import OpenAIClient
+        self.client = OpenAIClient()
         self.workflow = BookAnalysisWorkflow(self.client)
         self.state = AgentState(
             messages=[],

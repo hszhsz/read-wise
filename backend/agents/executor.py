@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 
-from services.deepseek_client import DeepSeekClient
+from services.openai_client import OpenAIClient
 from agents.state import AgentState, BookAnalysisTask, ExecutionStep, ChatMessage
 from agents.tools import BookSummaryTool, AuthorResearchTool, RecommendationTool
 
@@ -21,15 +21,15 @@ class TaskResult(BaseModel):
 class ExecutorAgent:
     """执行器智能体 - 负责执行具体的分析任务"""
     
-    def __init__(self, deepseek_client: DeepSeekClient):
-        self.client = deepseek_client
+    def __init__(self, openai_client: OpenAIClient):
+        self.client = openai_client
         self.parser = JsonOutputParser(pydantic_object=TaskResult)
         
         # 初始化工具
         self.tools = {
-            "summary": BookSummaryTool(deepseek_client),
-            "author_research": AuthorResearchTool(deepseek_client),
-            "recommendation": RecommendationTool(deepseek_client)
+            "summary": BookSummaryTool(openai_client),
+            "author_research": AuthorResearchTool(openai_client),
+            "recommendation": RecommendationTool(openai_client)
         }
     
     async def execute_next_task(self, state: AgentState) -> AgentState:
