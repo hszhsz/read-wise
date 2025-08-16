@@ -103,6 +103,10 @@ async def get_book_info(book_id: str, db = Depends(get_database)):
     if not book:
         raise HTTPException(status_code=404, detail="未找到该书籍")
     
+    # 移除MongoDB的ObjectId字段
+    if "_id" in book:
+        del book["_id"]
+    
     # 处理datetime类型，转换为ISO格式字符串
     if "upload_date" in book and isinstance(book["upload_date"], datetime):
         book["upload_date"] = book["upload_date"].isoformat()
@@ -164,6 +168,9 @@ async def list_books(
     # 将MongoDB文档转换为可序列化的字典
     serializable_books = []
     for book in books:
+        # 移除MongoDB的ObjectId字段
+        if "_id" in book:
+            del book["_id"]
         # 处理datetime类型，转换为ISO格式字符串
         if "upload_date" in book and isinstance(book["upload_date"], datetime):
             book["upload_date"] = book["upload_date"].isoformat()

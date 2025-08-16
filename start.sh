@@ -37,7 +37,7 @@ else
               -p 27017:27017 \
               -v readwise-mongodb-data:/data/db \
               --restart unless-stopped \
-              mongo:latest
+              mongo:7.0 --noauth
         fi
         
         # 等待 MongoDB 启动
