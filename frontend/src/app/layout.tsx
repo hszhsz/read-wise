@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from '../context/AppContext';
+import { LoggerProvider } from '../components/LoggerProvider';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AppProvider>
-          {children}
+          <LoggerProvider>
+            {children}
+          </LoggerProvider>
         </AppProvider>
       </body>
     </html>
