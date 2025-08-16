@@ -15,7 +15,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto text-center">
           <div className="mb-8">
             <h1 className="text-5xl md:text-7xl font-bold text-gray-800 mb-6">
-              你的一生
+              你一生的
               <span className="text-orange-600 relative">
                 阅读伙伴
                 <Sparkles className="absolute -top-2 -right-2 h-8 w-8 text-yellow-500" />

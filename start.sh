@@ -42,7 +42,7 @@ sleep 3
 # 启动前端服务（后台运行）
 echo "⚛️  启动前端服务 (端口 3000)..."
 cd ../frontend
-npm start &
+npm run dev &
 FRONTEND_PID=$!
 
 echo "✅ 服务启动完成！"
