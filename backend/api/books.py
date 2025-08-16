@@ -308,3 +308,38 @@ async def list_books(
     }
     
     return result
+
+@router.delete("/books/{book_id}")
+async def delete_book(book_id: str, db = Depends(get_database)):
+    """删除书籍"""
+    try:
+        # 检查书籍是否存在
+        book = await db.books.find_one({"id": book_id})
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 删除相关的聊天记录
+        await db.chat_messages.delete_many({"book_id": book_id})
+        
+        # 删除书籍文件（如果存在）
+        if "file_path" in book and book["file_path"] and os.path.exists(book["file_path"]):
+            try:
+                os.remove(book["file_path"])
+            except Exception as e:
+                print(f"删除文件失败: {e}")
+        
+        # 从数据库中删除书籍记录
+        result = await db.books.delete_one({"id": book_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=500, detail="删除书籍失败")
+        
+        return {
+            "message": "书籍删除成功",
+            "book_id": book_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除书籍时发生错误: {str(e)}")
