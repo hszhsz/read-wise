@@ -21,10 +21,15 @@ class MemoryCursor:
         self.skip_count = 0
         self.limit_count = None
     
-    def sort(self, criteria):
+    def sort(self, field_or_criteria, direction=None):
         # 支持 MongoDB 风格的排序
-        # criteria 是一个元组列表，如 [("field", 1), ("field2", -1)]
-        self.sort_fields = criteria
+        # 可以是 sort("field", 1) 或 sort([("field", 1), ("field2", -1)])
+        if direction is not None:
+            # 单字段排序：sort("field", 1)
+            self.sort_fields = [(field_or_criteria, direction)]
+        else:
+            # 多字段排序：sort([("field", 1), ("field2", -1)])
+            self.sort_fields = field_or_criteria
         return self
     
     def skip(self, count):
@@ -41,7 +46,23 @@ class MemoryCursor:
         
         if self.sort_fields:
             for field, direction in reversed(self.sort_fields):
-                result.sort(key=lambda x: x.get(field, None) if x.get(field, None) is not None else "", reverse=direction == -1)
+                def sort_key(x):
+                    value = x.get(field, None)
+                    if value is None:
+                        # 为不同字段类型提供合适的默认值
+                        if field == 'upload_date':
+                            return datetime.min
+                        else:
+                            return ""
+                    # 确保datetime对象的一致性
+                    if field == 'upload_date' and isinstance(value, str):
+                        try:
+                            from datetime import datetime
+                            return datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        except:
+                            return datetime.min
+                    return value
+                result.sort(key=sort_key, reverse=direction == -1)
         
         # 应用跳过
         if self.skip_count > 0:
@@ -131,13 +152,15 @@ class MemoryCollection:
 class MemoryDatabase:
     def __init__(self):
         self.collections = {}
-        # 预先创建books和book_results集合
+        # 预先创建books、book_results和chat_messages集合
         self.collections['books'] = MemoryCollection('books')
         self.collections['book_results'] = MemoryCollection('book_results')
+        self.collections['chat_messages'] = MemoryCollection('chat_messages')
         
         # 添加直接访问属性
         self.books = self.collections['books']
         self.book_results = self.collections['book_results']
+        self.chat_messages = self.collections['chat_messages']
     
     def __getitem__(self, name):
         if name not in self.collections:

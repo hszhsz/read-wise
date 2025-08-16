@@ -22,7 +22,7 @@ const BooksPage = () => {
     try {
       setLoading(true);
       const response = await booksApi.getBooks();
-      setBooks(response.data?.books || []);
+      setBooks(response.data?.data || []);
     } catch (error) {
       console.error('获取书籍列表失败:', error);
       addNotification({

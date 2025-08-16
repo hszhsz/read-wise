@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 from typing import List, Optional
 from pydantic import BaseModel
 import asyncio
@@ -195,3 +195,112 @@ async def get_analysis_result(session_id: str):
         raise HTTPException(status_code=404, detail="分析结果不存在")
     
     return agent.state.analysis_result.dict()
+
+# 基于书籍ID的聊天API
+class BookChatRequest(BaseModel):
+    book_id: str
+    message: str
+
+class BookChatMessage(BaseModel):
+    id: str
+    content: str
+    sender: str  # 'user' or 'ai'
+    timestamp: str
+
+@router.post("/")
+async def send_book_message(request: BookChatRequest, db = Depends(get_database)):
+    """发送基于书籍的聊天消息"""
+    try:
+        # 检查书籍是否存在
+        book = await db.books.find_one({"id": request.book_id})
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 保存用户消息到数据库
+        user_message = {
+            "id": str(uuid.uuid4()),
+            "book_id": request.book_id,
+            "content": request.message,
+            "sender": "user",
+            "timestamp": datetime.now().isoformat()
+        }
+        await db.chat_messages.insert_one(user_message)
+        
+        # 生成AI回复（这里可以集成实际的AI模型）
+        ai_response = f"这是对于《{book.get('title', '未知书籍')}》相关问题的回复：{request.message}"
+        
+        # 保存AI消息到数据库
+        ai_message = {
+            "id": str(uuid.uuid4()),
+            "book_id": request.book_id,
+            "content": ai_response,
+            "sender": "ai",
+            "timestamp": datetime.now().isoformat()
+        }
+        await db.chat_messages.insert_one(ai_message)
+        
+        return {
+            "response": ai_response,
+            "message_id": ai_message["id"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"发送消息失败: {str(e)}")
+
+@router.get("/history/{book_id}")
+async def get_book_chat_history(book_id: str, db = Depends(get_database)):
+    """获取书籍的聊天历史"""
+    try:
+        # 检查书籍是否存在
+        book = await db.books.find_one({"id": book_id})
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 获取聊天历史
+        cursor = db.chat_messages.find({"book_id": book_id}).sort("timestamp", 1)
+        messages = await cursor.to_list(length=None)
+        
+        # 转换消息格式
+        formatted_messages = []
+        for msg in messages:
+            formatted_messages.append({
+                "id": msg["id"],
+                "content": msg["content"],
+                "sender": msg["sender"],
+                "timestamp": msg["timestamp"]
+            })
+        
+        return {
+            "messages": formatted_messages,
+            "book_id": book_id,
+            "total": len(formatted_messages)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取聊天历史失败: {str(e)}")
+
+@router.delete("/history/{book_id}")
+async def clear_book_chat_history(book_id: str, db = Depends(get_database)):
+    """清空书籍的聊天历史"""
+    try:
+        # 检查书籍是否存在
+        book = await db.books.find_one({"id": book_id})
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 删除聊天历史
+        result = await db.chat_messages.delete_many({"book_id": book_id})
+        
+        return {
+            "message": "聊天历史已清空",
+            "deleted_count": result.deleted_count
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"清空聊天历史失败: {str(e)}")

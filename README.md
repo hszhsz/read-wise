@@ -40,22 +40,63 @@ Readwise是一款读书辅助软件，借助大语言模型和agent技术，为�
 
 ## 安装与运行
 
+### 快速开始（推荐）
+
+使用一键启动脚本，自动处理所有依赖和服务：
+
+```bash
+# 克隆项目
+git clone <repository-url>
+cd readwise
+
+# 设置环境变量（可选）
+cp .env.example .env
+# 编辑 .env 文件，添加 DEEPSEEK_API_KEY
+
+# 一键启动所有服务
+sh start.sh
+```
+
+启动脚本会自动：
+- 检查并安装依赖（uv、npm）
+- 启动 MongoDB Docker 容器（如果 Docker 可用）
+- 启动后端服务（端口 8000）
+- 启动前端服务（端口 3000）
+
 ### 环境要求
 
-- Python 3.9+
-- Node.js 14+
-- MongoDB
+- **必需**：Python 3.9+、Node.js 14+、uv
+- **推荐**：Docker（用于 MongoDB）
+- **可选**：MongoDB（如果不使用 Docker）
 
-### 后端设置
+### 数据库配置
+
+项目支持两种数据库模式：
+
+1. **MongoDB 模式**（推荐）：
+   - 自动使用 Docker 启动 MongoDB
+   - 数据持久化存储
+   - 无需手动安装 MongoDB
+
+2. **内存数据库模式**：
+   - 当 Docker 不可用时自动启用
+   - 数据临时存储，重启后丢失
+   - 适合开发和测试
+
+详细的 MongoDB 设置说明请参考 [MONGODB_SETUP.md](MONGODB_SETUP.md)
+
+### 手动设置（高级用户）
+
+#### 后端设置
 
 1. 进入后端目录：
    ```bash
    cd backend
    ```
 
-2. 安装依赖：
+2. 使用 uv 安装依赖：
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
 3. 设置环境变量：
@@ -64,15 +105,15 @@ Readwise是一款读书辅助软件，借助大语言模型和agent技术，为�
    DEEPSEEK_API_KEY=your_api_key_here
    MONGO_URL=mongodb://localhost:27017
    DATABASE_NAME=readwise
+   # USE_MEMORY_DB=false  # 可选：强制使用内存数据库
    ```
 
 4. 运行服务器：
    ```bash
-   python main.py
+   uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
-   服务器将在`http://localhost:8000`上运行。
 
-### 前端设置
+#### 前端设置
 
 1. 进入前端目录：
    ```bash
@@ -86,9 +127,8 @@ Readwise是一款读书辅助软件，借助大语言模型和agent技术，为�
 
 3. 运行开发服务器：
    ```bash
-   npm start
+   npm run dev
    ```
-   前端将在`http://localhost:3000`上运行。
 
 ## 使用流程
 
@@ -132,7 +172,9 @@ readwise/
 
 - 需要有效的DeepSeek API密钥才能使用大语言模型功能
 - 处理大型文件可能需要较长时间
-- 确保MongoDB服务已启动并可访问
+- 推荐安装 Docker 以获得最佳体验（自动管理 MongoDB）
+- 如果没有 Docker，系统会自动切换到内存数据库模式
+- 内存数据库模式下，数据在重启后会丢失
 
 ## 未来计划
 

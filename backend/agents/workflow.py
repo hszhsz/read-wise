@@ -358,3 +358,79 @@ class BookAnalysisWorkflow:
                 context_parts.append(f"推荐书籍：{'; '.join(rec_titles)}")
         
         return "\n\n".join(context_parts) if context_parts else "暂无分析结果"
+
+
+class BookAnalysisAgent:
+    """书籍分析智能体 - BookAnalysisWorkflow的包装器，提供简化的接口"""
+    
+    def __init__(self):
+        from services.deepseek_client import DeepSeekClient
+        self.client = DeepSeekClient()
+        self.workflow = BookAnalysisWorkflow(self.client)
+        self.state = AgentState(
+            messages=[],
+            book_info=None,
+            plan=[],
+            current_task=None,
+            results={},
+            execution_steps=[],
+            errors=[],
+            session_id=str(uuid.uuid4()),
+            user_input="",
+            needs_human_input=False,
+            current_step="initialized",
+            is_complete=False
+        )
+    
+    async def handle_user_message(self, message: str) -> Dict[str, Any]:
+        """处理用户消息"""
+        # 更新状态
+        self.state["user_input"] = message
+        
+        # 如果有书籍信息，继续对话
+        if self.state.get("book_info"):
+            updated_state = await self.workflow.continue_conversation(self.state, message)
+            self.state.update(updated_state)
+            
+            # 获取最新的AI消息
+            ai_messages = [msg for msg in self.state["messages"] if hasattr(msg, 'content')]
+            latest_message = ai_messages[-1].content if ai_messages else "我正在处理您的请求..."
+            
+            return {
+                "message": latest_message,
+                "state": self.get_state_dict(),
+                "is_processing": not self.state.get("is_complete", False)
+            }
+        else:
+            return {
+                "message": "请先上传一本书籍进行分析，然后我们可以开始对话。",
+                "state": self.get_state_dict(),
+                "is_processing": False
+            }
+    
+    async def start_book_analysis(self, book_info: BookInfo) -> Dict[str, Any]:
+        """开始书籍分析"""
+        self.state["book_info"] = book_info
+        result = await self.workflow.run_analysis(book_info, "请分析这本书籍")
+        self.state.update(result)
+        
+        # 获取分析完成消息
+        ai_messages = [msg for msg in self.state["messages"] if hasattr(msg, 'content')]
+        latest_message = ai_messages[-1].content if ai_messages else "书籍分析已开始..."
+        
+        return {
+            "message": latest_message,
+            "state": self.get_state_dict(),
+            "is_processing": not self.state.get("is_complete", False)
+        }
+    
+    def get_state_dict(self) -> Dict[str, Any]:
+        """获取状态字典"""
+        return {
+            "session_id": self.state.get("session_id"),
+            "current_step": self.state.get("current_step"),
+            "is_complete": self.state.get("is_complete", False),
+            "book_info": self.state.get("book_info").dict() if self.state.get("book_info") else None,
+            "results": self.state.get("results", {}),
+            "errors": self.state.get("errors", [])
+        }

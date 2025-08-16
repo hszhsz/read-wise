@@ -7,7 +7,7 @@ from typing import List, Optional
 from datetime import datetime
 
 # 导入服务和模型
-# from services.book_processor import process_book  # 暂时注释，等langchain问题解决
+# from services.book_processor import process_book  # 暂时注释，等langchain依赖解决
 from models.book import BookMetadata, BookAnalysisResult
 from models.database import get_database
 from utils.file_utils import save_uploaded_file, extract_text_from_file, generate_unique_filename
@@ -88,13 +88,26 @@ async def upload_book(
     await db.books.insert_one(metadata.dict())
     
     # 在后台启动处理任务
-    background_tasks.add_task(process_book, book_id, file_path)
+    # background_tasks.add_task(process_book, book_id, file_path)  # 暂时注释，等langchain依赖解决
     
     return {
         "message": "文件上传成功，正在处理中",
         "book_id": book_id,
         "status": "pending"
     }
+
+@router.get("/books/{book_id}/info", response_model=BookMetadata)
+async def get_book_info(book_id: str, db = Depends(get_database)):
+    """获取书籍基本信息（元数据）"""
+    book = await db.books.find_one({"id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="未找到该书籍")
+    
+    # 处理datetime类型，转换为ISO格式字符串
+    if "upload_date" in book and isinstance(book["upload_date"], datetime):
+        book["upload_date"] = book["upload_date"].isoformat()
+    
+    return BookMetadata(**book)
 
 @router.get("/books/{book_id}", response_model=BookAnalysisResult)
 async def get_book_analysis(book_id: str, db = Depends(get_database)):

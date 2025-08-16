@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8000',
+  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8000/api',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -43,6 +43,11 @@ export const booksApi = {
     return api.get(`/books/${bookId}`);
   },
 
+  // 获取书籍详情（别名方法）
+  getBookDetail: (bookId) => {
+    return api.get(`/books/${bookId}/info`);
+  },
+
   // 上传书籍
   uploadBook: (formData) => {
     return api.post('/books/upload', formData, {
@@ -68,7 +73,7 @@ export const booksApi = {
 export const chatApi = {
   // 发送聊天消息
   sendMessage: (bookId, message) => {
-    return api.post('/chat', {
+    return api.post('/chat/', {
       book_id: bookId,
       message: message,
     });
