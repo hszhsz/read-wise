@@ -5,6 +5,7 @@ import { Send, Bot, User, BookOpen, MessageCircle, Loader2, Trash2, RotateCcw } 
 import ReactMarkdown from 'react-markdown';
 import { useAppContext } from '../../context/AppContext';
 import { chatApi, booksApi } from '../../services/api';
+import Layout from '../../components/Layout';
 
 const ChatPage = () => {
   const { books, setBooks, addNotification } = useAppContext();
@@ -135,50 +136,51 @@ const ChatPage = () => {
   const selectedBook = books.find(book => book.id === selectedBookId);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50">
-      {/* 顶部导航栏 */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <MessageCircle className="h-8 w-8 text-orange-600" />
-                <h1 className="text-2xl font-bold text-gray-800">AI 对话</h1>
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50">
+        {/* 页面标题栏 */}
+        <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <MessageCircle className="h-8 w-8 text-orange-600" />
+                  <h1 className="text-2xl font-bold text-gray-800">AI 对话</h1>
+                </div>
+                
+                {selectedBook && (
+                  <div className="hidden md:flex items-center space-x-2 text-gray-600">
+                    <span>正在讨论:</span>
+                    <span className="font-medium text-gray-800">{selectedBook.title}</span>
+                  </div>
+                )}
               </div>
               
-              {selectedBook && (
-                <div className="hidden md:flex items-center space-x-2 text-gray-600">
-                  <span>正在讨论:</span>
-                  <span className="font-medium text-gray-800">{selectedBook.title}</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {messages.length > 0 && (
-                <>
-                  <button
-                    onClick={resetChat}
-                    className="flex items-center space-x-1 text-gray-600 hover:text-orange-600 transition-colors"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    <span className="hidden sm:inline">重置</span>
-                  </button>
-                  <button
-                    onClick={clearChat}
-                    className="flex items-center space-x-1 text-gray-600 hover:text-red-600 transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">清空</span>
-                  </button>
-                </>
-              )}
+              <div className="flex items-center space-x-4">
+                {messages.length > 0 && (
+                  <>
+                    <button
+                      onClick={resetChat}
+                      className="flex items-center space-x-1 text-gray-600 hover:text-orange-600 transition-colors"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      <span className="hidden sm:inline">重置</span>
+                    </button>
+                    <button
+                      onClick={clearChat}
+                      className="flex items-center space-x-1 text-gray-600 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">清空</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)]">
           {/* 侧边栏 - 书籍选择 */}
           <div className="lg:col-span-1">
@@ -380,7 +382,8 @@ const ChatPage = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 };
 
