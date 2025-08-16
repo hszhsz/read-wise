@@ -3,21 +3,19 @@ import time
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
 # 导入数据库初始化函数
 from models.database import init_db
 # 导入日志配置
 from utils.logger import setup_logger, log_info, log_error, log_access
-
-# 加载环境变量
-load_dotenv()
+# 导入环境变量加载
+from utils.env import get_env
 
 # 设置日志
 logger = setup_logger()
 
 # 检查必要的环境变量
-if not os.getenv("DEEPSEEK_API_KEY"):
+if not get_env("DEEPSEEK_API_KEY"):
     log_error("DEEPSEEK_API_KEY 环境变量未设置", exc_info=False)
 
 app = FastAPI(title="Readwise API", description="读书辅助软件API服务")
@@ -85,10 +83,14 @@ async def root():
 
 if __name__ == "__main__":
     log_info("启动Readwise API服务器...")
+    host = get_env("HOST", "0.0.0.0")
+    port = int(get_env("PORT", "8000"))
+    debug = get_env("DEBUG", "True").lower() == "true"
+    
     uvicorn.run(
         "main:app", 
-        host="0.0.0.0", 
-        port=8000, 
-        reload=True,
+        host=host, 
+        port=port, 
+        reload=debug,
         log_config=None  # 使用我们自定义的日志配置
     )

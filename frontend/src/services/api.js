@@ -1,13 +1,36 @@
 import axios from 'axios';
 
+// 获取API基础URL
+const getApiBaseUrl = () => {
+  // 优先使用环境变量
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // 根据环境自动判断
+  if (process.env.NODE_ENV === 'production') {
+    return '/api';
+  }
+  
+  // 开发环境默认值
+  const host = process.env.NEXT_PUBLIC_API_HOST || 'localhost';
+  const port = process.env.NEXT_PUBLIC_API_PORT || '8000';
+  return `http://${host}:${port}/api`;
+};
+
 // 创建axios实例
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8000/api',
+  baseURL: getApiBaseUrl(),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// 打印当前API配置（仅开发环境）
+if (process.env.NODE_ENV === 'development') {
+  console.log('API Base URL:', getApiBaseUrl());
+}
 
 // 请求拦截器
 api.interceptors.request.use(
