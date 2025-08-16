@@ -31,9 +31,9 @@ const Layout = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
-              <BookOpen className="h-8 w-8 text-orange-600" />
-              <span className="text-xl font-bold text-gray-800">ReadWise</span>
+            <Link href="/" className="flex items-center space-x-3 group">
+              <BookOpen className="h-9 w-9 text-orange-600 group-hover:text-orange-700 transition-colors" />
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-gray-800 via-gray-700 to-orange-600 bg-clip-text text-transparent tracking-tight hover:from-orange-600 hover:via-orange-700 hover:to-gray-800 transition-all duration-300">READWISE</span>
             </Link>
 
             {/* 桌面导航 */}
@@ -110,9 +110,9 @@ const Layout = ({ children }) => {
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <BookOpen className="h-8 w-8 text-orange-400" />
-                <span className="text-xl font-bold">ReadWise</span>
+              <div className="flex items-center space-x-3 mb-4">
+                <BookOpen className="h-9 w-9 text-orange-400" />
+                <span className="text-2xl font-extrabold bg-gradient-to-r from-white via-orange-100 to-orange-400 bg-clip-text text-transparent tracking-tight">READWISE</span>
               </div>
               <p className="text-gray-400">
                 你的一生阅读伙伴，用AI的智慧陪伴每一次阅读旅程。
