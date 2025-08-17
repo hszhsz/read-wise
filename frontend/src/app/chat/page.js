@@ -300,10 +300,10 @@ const ChatPage = () => {
                                   : 'bg-gray-100 text-gray-800'
                               }`}
                             >
-                              <div className="prose prose-sm max-w-none">
-                                <ReactMarkdown
-                                  className={message.sender === 'user' ? 'text-white' : 'text-gray-800'}
-                                >
+                              <div className={`prose prose-sm max-w-none ${
+                                message.sender === 'user' ? 'text-white' : 'text-gray-800'
+                              }`}>
+                                <ReactMarkdown>
                                   {message.content}
                                 </ReactMarkdown>
                               </div>

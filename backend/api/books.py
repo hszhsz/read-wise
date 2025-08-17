@@ -7,14 +7,15 @@ from typing import List, Optional
 from datetime import datetime
 
 # 导入服务和模型
-# from services.book_processor import process_book  # 暂时注释，等langchain依赖解决
 from models.book import BookMetadata, BookAnalysisResult
 from models.database import get_database
 from utils.file_utils import save_uploaded_file, extract_text_from_file, generate_unique_filename
 from services.openai_client import OpenAIClient
 from agents.workflow import run_analysis
+from utils.logger import get_logger, log_info, log_error, log_warning
 
 router = APIRouter(tags=["books"])
+logger = get_logger("books_api")
 
 # 支持的文件类型
 SUPPORTED_FILE_TYPES = {
@@ -52,9 +53,12 @@ async def upload_book(
     author: Optional[str] = Form(None),
     db = Depends(get_database)
 ):
+    logger.info(f"开始上传书籍: {file.filename}, 类型: {file.content_type}")
+    
     # 验证文件类型
     content_type = file.content_type
     if content_type not in SUPPORTED_FILE_TYPES:
+        logger.warning(f"不支持的文件格式: {content_type}, 文件: {file.filename}")
         raise HTTPException(
             status_code=400, 
             detail=f"不支持的文件格式: {content_type}。支持的格式: {', '.join(SUPPORTED_FILE_TYPES.values())}"
@@ -64,13 +68,16 @@ async def upload_book(
     file_extension = SUPPORTED_FILE_TYPES[content_type]
     unique_filename = f"{uuid.uuid4()}{file_extension}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    logger.info(f"生成文件路径: {file_path}")
     
     # 保存文件
     try:
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
+        logger.info(f"文件保存成功: {file_path}, 大小: {len(content)} 字节")
     except Exception as e:
+        logger.error(f"文件保存失败: {str(e)}, 文件: {file.filename}")
         raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
     
     # 创建书籍元数据
@@ -87,9 +94,11 @@ async def upload_book(
     
     # 保存元数据到数据库
     await db.books.insert_one(metadata.dict())
+    logger.info(f"书籍元数据已保存到数据库: {book_id}, 标题: {metadata.title}")
     
     # 在后台启动处理任务
-    # background_tasks.add_task(process_book, book_id, file_path)  # 暂时注释，等langchain依赖解决
+    background_tasks.add_task(analyze_book_content, book_id, file_path, db)
+    logger.info(f"已启动书籍分析后台任务: {book_id}")
     
     return {
         "message": "文件上传成功，正在处理中",
@@ -150,33 +159,33 @@ async def analyze_book(book_id: str, background_tasks: BackgroundTasks, db = Dep
 
 async def analyze_book_content(book_id: str, file_path: str, db):
     """分析书籍内容的后台任务"""
-    print(f"开始分析书籍: {book_id}")
+    logger.info(f"开始分析书籍: {book_id}")
     try:
         # 更新状态为处理中
-        print(f"更新书籍状态为processing: {book_id}")
+        logger.info(f"更新书籍状态为processing: {book_id}")
         await db.books.update_one(
             {"id": book_id},
             {"$set": {"status": "processing"}}
         )
         
         # 读取文件内容
-        print(f"读取文件内容: {file_path}")
+        logger.info(f"读取文件内容: {file_path}")
         try:
             content = extract_text_from_file(file_path)
-            print(f"文件内容长度: {len(content)} 字符")
+            logger.info(f"文件内容长度: {len(content)} 字符")
         except Exception as e:
-            print(f"文件内容提取失败: {str(e)}")
+            logger.error(f"文件内容提取失败: {str(e)}")
             raise Exception(f"无法提取文件内容: {str(e)}")
         
         # 使用Agent Workflow进行分析
-        print("开始使用Agent Workflow分析书籍")
+        logger.info("开始使用Agent Workflow分析书籍")
         
         # 调用agent workflow
         analysis_result = await run_analysis(
             book_content=content,
             user_input="请分析这本书的内容，提供摘要、关键点和推荐"
         )
-        print(f"Agent分析结果: {analysis_result}")
+        logger.info(f"Agent分析完成，结果类型: {type(analysis_result)}")
         
         # 从agent结果中提取信息
         if analysis_result and hasattr(analysis_result, 'final_output'):
@@ -216,25 +225,25 @@ async def analyze_book_content(book_id: str, file_path: str, db):
             "processing_time": 0.0,
             "created_at": datetime.now()
         }
-        print(f"准备保存分析结果: {analysis_result}")
+        logger.info(f"准备保存分析结果到数据库: {book_id}")
         
         # 更新数据库
-        print("开始更新book_analysis集合")
+        logger.info("开始更新book_analysis集合")
         result = await db.book_analysis.replace_one(
             {"book_id": book_id},
             analysis_result,
             upsert=True
         )
-        print(f"book_analysis更新结果: {result.modified_count} modified, {result.upserted_id} upserted")
+        logger.info(f"book_analysis更新结果: {result.modified_count} modified, {result.upserted_id} upserted")
         
         # 更新书籍状态
-        print("开始更新书籍状态为completed")
+        logger.info("开始更新书籍状态为completed")
         book_result = await db.books.update_one(
             {"id": book_id},
             {"$set": {"status": "completed"}}
         )
-        print(f"书籍状态更新结果: {book_result.modified_count} modified")
-        print(f"分析任务完成: {book_id}")
+        logger.info(f"书籍状态更新结果: {book_result.modified_count} modified")
+        logger.info(f"分析任务完成: {book_id}")
         
     except Exception as e:
         # 更新状态为失败
@@ -242,7 +251,7 @@ async def analyze_book_content(book_id: str, file_path: str, db):
             {"id": book_id},
             {"$set": {"status": "failed"}}
         )
-        print(f"分析书籍 {book_id} 时出错: {str(e)}")
+        logger.error(f"分析书籍 {book_id} 时出错: {str(e)}", exc_info=True)
 
 @router.get("/books")
 async def list_books(
